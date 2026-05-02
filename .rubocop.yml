@@ -1,0 +1,52 @@
+# Omakase Ruby styling for Rails
+inherit_gem: { rubocop-rails-omakase: rubocop.yml }
+
+plugins:
+  - rubocop-rspec
+  - rubocop-rspec_rails
+
+inherit_mode:
+  merge:
+    - Exclude
+
+AllCops:
+  NewCops: enable
+  Exclude:
+    - "db/**/*"
+    - "bin/**/*"
+    - "config/**/*"
+    - "tmp/**/*"
+    - "vendor/**/*"
+
+# Match the established Ruby services and the existing chat code without a noisy, unrelated
+# formatting rewrite.
+Layout/SpaceInsideArrayLiteralBrackets:
+  EnforcedStyle: no_space
+
+Layout/SpaceInsideHashLiteralBraces:
+  EnforcedStyle: no_space
+
+Style/Documentation:
+  Enabled: false
+
+Metrics/BlockLength:
+  Enabled: false
+
+Metrics/MethodLength:
+  Max: 40
+  Exclude:
+    - "spec/**/*"
+
+Metrics/AbcSize:
+  Enabled: false
+
+Layout/LineLength:
+  Max: 140
+
+# Security-oriented examples frequently need to assert both the sanitized value and its derived
+# representation. Keeping those assertions together makes the invariant easier to audit.
+RSpec/MultipleExpectations:
+  Enabled: false
+
+RSpec/ExampleLength:
+  Enabled: false
