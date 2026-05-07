@@ -1,0 +1,10 @@
+development:
+  adapter: async
+
+test:
+  adapter: test
+
+production:
+  # Демо: один инстанс → async-шина в процессе, Redis не нужен.
+  # Несколько реплик → adapter: redis + REDIS_URL.
+  adapter: async
