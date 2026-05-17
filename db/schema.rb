@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_10_123000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_17_130500) do
   create_table "messages", force: :cascade do |t|
     t.text "body"
     t.datetime "created_at", null: false
@@ -33,8 +33,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_10_123000) do
 
   create_table "rooms", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.string "dm_key"
     t.string "name"
     t.datetime "updated_at", null: false
+    t.index ["dm_key"], name: "index_rooms_on_dm_key", unique: true
   end
 
   create_table "users", force: :cascade do |t|
