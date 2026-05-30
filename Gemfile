@@ -4,6 +4,8 @@ source "https://rubygems.org"
 gem "rails", "~> 8.0.2"
 # Use sqlite3 as the database for Active Record (development/test)
 gem "sqlite3", ">= 1.4"
+# Postgres — durable-БД в production (Render free Postgres переживает сон/редеплой, в отличие от эфемерной ФС)
+gem "pg", "~> 1.5"
 # Use the Puma web server [https://github.com/puma/puma]
 gem "puma", ">= 5.0"
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]

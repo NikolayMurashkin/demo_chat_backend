@@ -152,6 +152,13 @@ GEM
     parser (3.3.12.0)
       ast (~> 2.4.1)
       racc
+    pg (1.6.3-x86_64-linux-musl)
+    pg (1.6.3-x86_64-linux-musl)
+    pg (1.6.3-x86_64-linux-musl)
+    pg (1.6.3-x86_64-linux-musl)
+    pg (1.6.3-x86_64-linux-musl)
+    pg (1.6.3-x86_64-linux-musl)
+    pg (1.6.3-x86_64-linux-musl)
     pp (0.6.4)
       prettyprint
     prettyprint (0.2.0)
@@ -284,6 +291,7 @@ DEPENDENCIES
   bootsnap
   brakeman
   debug
+  pg (~> 1.5)
   puma (>= 5.0)
   rack-cors
   rails (~> 8.0.2)
