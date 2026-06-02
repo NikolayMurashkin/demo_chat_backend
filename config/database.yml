@@ -27,7 +27,16 @@ test:
 #
 # Similarly, if you deploy your application as a Docker container, you must
 # ensure the database is located in a persisted volume.
-
+# Production — Postgres по DATABASE_URL (Render free Postgres: durable, переживает сон/редеплой).
+# Локальная разработка остаётся на SQLite (development/test выше).
 production:
-  <<: *default
-  database: storage/production.sqlite3
+  adapter: postgresql
+  encoding: unicode
+  # Пул делят три независимых потребителя, а не одни только веб-потоки: HTTP-треды Puma,
+  # воркеры ActionCable (каждый connect/subscribe/receive лезет в БД) и треды ActiveJob.
+  # Привязка пула к одному RAILS_MAX_THREADS занижала его — треды ждали коннект по 5 секунд
+  # и запрос выглядел как зависшая загрузка.
+  pool: <%= ENV.fetch("DB_POOL") { Integer(ENV.fetch("RAILS_MAX_THREADS", 5)) + Integer(ENV.fetch("CABLE_WORKER_POOL_SIZE", 4)) + 5 } %>
+  # Ждать коннект дольше пары секунд смысла нет: лучше быстрая ошибка, чем висящий сокет.
+  checkout_timeout: <%= ENV.fetch("DB_CHECKOUT_TIMEOUT", 3) %>
+  url: <%= ENV["DATABASE_URL"] %>
