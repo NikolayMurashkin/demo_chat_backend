@@ -10,7 +10,18 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_06_114000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_07_121500) do
+  create_table "message_reactions", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "emoji", null: false
+    t.integer "message_id", null: false
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.index ["message_id", "user_id", "emoji"], name: "index_message_reactions_on_message_id_and_user_id_and_emoji", unique: true
+    t.index ["message_id"], name: "index_message_reactions_on_message_id"
+    t.index ["user_id"], name: "index_message_reactions_on_user_id"
+  end
+
   create_table "messages", force: :cascade do |t|
     t.text "body"
     t.datetime "created_at", null: false
@@ -50,6 +61,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_06_114000) do
     t.index ["external_id"], name: "index_users_on_external_id", unique: true
   end
 
+  add_foreign_key "message_reactions", "messages"
+  add_foreign_key "message_reactions", "users"
   add_foreign_key "messages", "messages", column: "reply_to_id"
   add_foreign_key "messages", "rooms"
   add_foreign_key "messages", "users"
