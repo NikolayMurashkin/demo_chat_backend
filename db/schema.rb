@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_13_142000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_14_110500) do
   create_table "message_reactions", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "emoji", null: false
@@ -27,11 +27,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_13_142000) do
     t.datetime "created_at", null: false
     t.datetime "deleted_at"
     t.datetime "edited_at"
+    t.datetime "pinned_at"
     t.integer "reply_to_id"
     t.integer "room_id", null: false
     t.datetime "updated_at", null: false
     t.integer "user_id", null: false
     t.index ["reply_to_id"], name: "index_messages_on_reply_to_id"
+    t.index ["room_id", "pinned_at"], name: "index_messages_on_room_id_and_pinned_at"
     t.index ["room_id"], name: "index_messages_on_room_id"
     t.index ["user_id"], name: "index_messages_on_user_id"
   end
