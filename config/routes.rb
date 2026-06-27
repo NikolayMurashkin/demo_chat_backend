@@ -8,6 +8,9 @@ Rails.application.routes.draw do
   namespace :api do
     resources :rooms, only: %i[index show create update destroy] do
       resources :messages, only: %i[index create]
+
+      # Вкладка «Медиа»: вложения и ссылки комнаты одним списком.
+      get "attachments", to: "attachments#index"
     end
   end
 end
