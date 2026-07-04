@@ -6,6 +6,9 @@ Rails.application.routes.draw do
   get "up" => "rails/health#show", as: :rails_health_check
 
   namespace :api do
+    # Пересылка кросс-комнатная, поэтому вне вложенного ресурса комнаты.
+    post "messages/forward", to: "messages#forward"
+
     resources :rooms, only: %i[index show create update destroy] do
       resources :messages, only: %i[index create]
 
