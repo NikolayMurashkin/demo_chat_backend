@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_05_113000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_11_131500) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -72,6 +72,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_05_113000) do
     t.datetime "edited_at"
     t.string "forwarded_from_external_id"
     t.string "forwarded_from_name"
+    t.text "link_preview"
     t.datetime "pinned_at"
     t.text "plain_body"
     t.integer "reply_to_id"
@@ -95,17 +96,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_05_113000) do
   end
 
   create_table "rooms", force: :cascade do |t|
+    t.string "avatar_url"
     t.datetime "created_at", null: false
     t.string "dm_key"
     t.string "name"
+    t.integer "owner_id"
     t.datetime "updated_at", null: false
     t.index ["dm_key"], name: "index_rooms_on_dm_key", unique: true
+    t.index ["owner_id"], name: "index_rooms_on_owner_id"
   end
 
   create_table "users", force: :cascade do |t|
     t.string "avatar_url"
     t.datetime "created_at", null: false
     t.string "external_id"
+    t.datetime "last_seen_at"
     t.string "name"
     t.datetime "updated_at", null: false
     t.index ["external_id"], name: "index_users_on_external_id", unique: true
