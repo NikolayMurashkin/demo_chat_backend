@@ -1,7 +1,7 @@
 source "https://rubygems.org"
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
-gem "rails", "~> 8.0.2"
+gem "rails", "~> 8.1.0"
 # Use sqlite3 as the database for Active Record (development/test)
 gem "sqlite3", ">= 1.4"
 # Postgres — durable-БД в production (Render free Postgres переживает сон/редеплой, в отличие от эфемерной ФС)
