@@ -6,6 +6,8 @@ Rails.application.routes.draw do
   get "up" => "rails/health#show", as: :rails_health_check
 
   namespace :api do
+    # Глобальный поиск панели диалогов: чаты по названию + сообщения по всем комнатам.
+    get "search", to: "search#index"
     # Пересылка кросс-комнатная, поэтому вне вложенного ресурса комнаты.
     post "messages/forward", to: "messages#forward"
 
@@ -14,7 +16,12 @@ Rails.application.routes.draw do
         post :group, to: "rooms#create_group"
       end
 
-      resources :messages, only: %i[index create]
+      resources :messages, only: %i[index create] do
+        collection do
+          get :search
+        end
+
+      end
 
       # Вкладка «Медиа»: вложения и ссылки комнаты одним списком.
       get "attachments", to: "attachments#index"
