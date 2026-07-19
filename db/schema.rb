@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_18_112000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_19_124000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -86,11 +86,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_18_112000) do
     t.text "plain_body"
     t.integer "reply_to_id"
     t.integer "room_id", null: false
+    t.integer "thread_root_id"
     t.datetime "updated_at", null: false
     t.integer "user_id", null: false
     t.index ["reply_to_id"], name: "index_messages_on_reply_to_id"
     t.index ["room_id", "pinned_at"], name: "index_messages_on_room_id_and_pinned_at"
     t.index ["room_id"], name: "index_messages_on_room_id"
+    t.index ["thread_root_id", "id"], name: "index_messages_on_thread_root_id_and_id"
+    t.index ["thread_root_id"], name: "index_messages_on_thread_root_id"
     t.index ["user_id"], name: "index_messages_on_user_id"
   end
 
@@ -132,6 +135,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_18_112000) do
   add_foreign_key "message_reactions", "messages"
   add_foreign_key "message_reactions", "users"
   add_foreign_key "messages", "messages", column: "reply_to_id"
+  add_foreign_key "messages", "messages", column: "thread_root_id"
   add_foreign_key "messages", "rooms"
   add_foreign_key "messages", "users"
   add_foreign_key "room_memberships", "rooms"

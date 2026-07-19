@@ -21,6 +21,9 @@ Rails.application.routes.draw do
           get :search
         end
 
+        member do
+          get :thread
+        end
       end
 
       # Вкладка «Медиа»: вложения и ссылки комнаты одним списком.
