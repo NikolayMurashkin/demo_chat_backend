@@ -10,6 +10,8 @@ Rails.application.routes.draw do
     get "search", to: "search#index"
     # Пересылка кросс-комнатная, поэтому вне вложенного ресурса комнаты.
     post "messages/forward", to: "messages#forward"
+    post "messages/:id/save", to: "messages#save"
+    post "rooms/saved", to: "rooms#saved"
 
     resources :rooms, only: %i[index show create update destroy] do
       collection do

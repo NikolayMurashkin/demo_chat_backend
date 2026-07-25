@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_19_124000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_25_115000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -114,9 +114,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_124000) do
     t.string "dm_key"
     t.string "name"
     t.integer "owner_id"
+    t.integer "saved_for_id"
     t.datetime "updated_at", null: false
     t.index ["dm_key"], name: "index_rooms_on_dm_key", unique: true
     t.index ["owner_id"], name: "index_rooms_on_owner_id"
+    t.index ["saved_for_id"], name: "index_rooms_on_saved_for_id", unique: true
   end
 
   create_table "users", force: :cascade do |t|
@@ -140,4 +142,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_124000) do
   add_foreign_key "messages", "users"
   add_foreign_key "room_memberships", "rooms"
   add_foreign_key "room_memberships", "users"
+  add_foreign_key "rooms", "users", column: "saved_for_id"
 end
