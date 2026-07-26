@@ -28,6 +28,8 @@ Rails.application.routes.draw do
         end
       end
 
+      resources :scheduled_messages, only: %i[index create update destroy]
+
       # Вкладка «Медиа»: вложения и ссылки комнаты одним списком.
       get "attachments", to: "attachments#index"
 

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_25_115000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_26_122500) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -121,6 +121,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_25_115000) do
     t.index ["saved_for_id"], name: "index_rooms_on_saved_for_id", unique: true
   end
 
+  create_table "scheduled_messages", force: :cascade do |t|
+    t.text "body", null: false
+    t.datetime "cancelled_at"
+    t.datetime "created_at", null: false
+    t.datetime "deliver_at", null: false
+    t.datetime "delivered_at"
+    t.integer "room_id", null: false
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.index ["deliver_at"], name: "index_scheduled_messages_on_deliver_at"
+    t.index ["room_id"], name: "index_scheduled_messages_on_room_id"
+    t.index ["user_id", "deliver_at"], name: "index_scheduled_messages_on_user_id_and_deliver_at"
+    t.index ["user_id"], name: "index_scheduled_messages_on_user_id"
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "avatar_url"
     t.datetime "created_at", null: false
@@ -143,4 +158,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_25_115000) do
   add_foreign_key "room_memberships", "rooms"
   add_foreign_key "room_memberships", "users"
   add_foreign_key "rooms", "users", column: "saved_for_id"
+  add_foreign_key "scheduled_messages", "rooms"
+  add_foreign_key "scheduled_messages", "users"
 end
