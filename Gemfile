@@ -43,9 +43,11 @@ group :development, :test do
   gem "rubocop-rspec", "~> 3.8", require: false
   gem "rubocop-rspec_rails", "~> 2.32", require: false
 
-  # The same test stack used by the maintained Ruby services.
+  # The same test stack used by the maintained Ruby services. WebMock keeps any future
+  # integration tests for link previews from accidentally reaching the public internet.
   gem "factory_bot_rails", "~> 6.5"
   gem "faker", "~> 3.5"
   gem "rspec-rails", "~> 8.0"
   gem "simplecov", "~> 0.22", require: false
+  gem "webmock", "~> 3.26"
 end
