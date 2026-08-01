@@ -6,6 +6,8 @@ Rails.application.routes.draw do
   get "up" => "rails/health#show", as: :rails_health_check
 
   namespace :api do
+    get "status", to: "statuses#show"
+    patch "status", to: "statuses#update"
     # Глобальный поиск панели диалогов: чаты по названию + сообщения по всем комнатам.
     get "search", to: "search#index"
     # Пересылка кросс-комнатная, поэтому вне вложенного ресурса комнаты.

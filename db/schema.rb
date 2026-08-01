@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_01_113500) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_01_151000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -140,6 +140,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_01_113500) do
 
   create_table "users", force: :cascade do |t|
     t.string "avatar_url"
+    t.string "chat_status", default: "online", null: false
+    t.text "chat_status_text", default: "В сети", null: false
     t.datetime "created_at", null: false
     t.string "external_id"
     t.datetime "last_seen_at"
