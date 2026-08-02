@@ -20,6 +20,11 @@ Rails.application.routes.draw do
         post :group, to: "rooms#create_group"
       end
 
+      member do
+        post :block, to: "blocks#create"
+        delete :block, to: "blocks#destroy"
+      end
+
       resources :messages, only: %i[index create] do
         collection do
           get :search

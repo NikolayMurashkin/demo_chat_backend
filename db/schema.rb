@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_01_151000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_02_122000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -138,6 +138,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_01_151000) do
     t.index ["user_id"], name: "index_scheduled_messages_on_user_id"
   end
 
+  create_table "user_blocks", force: :cascade do |t|
+    t.integer "blocked_id", null: false
+    t.integer "blocker_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["blocked_id"], name: "index_user_blocks_on_blocked_id"
+    t.index ["blocker_id", "blocked_id"], name: "index_user_blocks_on_blocker_id_and_blocked_id", unique: true
+    t.index ["blocker_id"], name: "index_user_blocks_on_blocker_id"
+    t.check_constraint "blocker_id <> blocked_id", name: "user_blocks_distinct_users"
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "avatar_url"
     t.string "chat_status", default: "online", null: false
@@ -164,4 +175,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_01_151000) do
   add_foreign_key "rooms", "users", column: "saved_for_id"
   add_foreign_key "scheduled_messages", "rooms"
   add_foreign_key "scheduled_messages", "users"
+  add_foreign_key "user_blocks", "users", column: "blocked_id"
+  add_foreign_key "user_blocks", "users", column: "blocker_id"
 end
