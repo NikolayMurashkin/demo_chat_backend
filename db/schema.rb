@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_08_111500) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_08_144000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -61,6 +61,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_08_111500) do
     t.text "waveform"
     t.integer "width"
     t.index ["message_id"], name: "index_message_attachments_on_message_id"
+  end
+
+  create_table "message_mentions", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "message_id", null: false
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.index ["message_id", "user_id"], name: "index_message_mentions_on_message_id_and_user_id", unique: true
+    t.index ["message_id"], name: "index_message_mentions_on_message_id"
+    t.index ["user_id", "message_id"], name: "index_message_mentions_on_user_id_and_message_id"
+    t.index ["user_id"], name: "index_message_mentions_on_user_id"
   end
 
   create_table "message_reactions", force: :cascade do |t|
@@ -168,6 +179,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_08_111500) do
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "message_attachments", "messages"
+  add_foreign_key "message_mentions", "messages"
+  add_foreign_key "message_mentions", "users"
   add_foreign_key "message_reactions", "messages"
   add_foreign_key "message_reactions", "users"
   add_foreign_key "messages", "messages", column: "reply_to_id"
