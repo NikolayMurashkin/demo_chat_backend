@@ -25,6 +25,9 @@ Rails.application.routes.draw do
         delete :block, to: "blocks#destroy"
       end
 
+      # Приглушение, закрепление и ручная пометка «непрочитано» — настройки участника, не комнаты.
+      patch "membership", to: "memberships#update"
+
       resources :messages, only: %i[index create] do
         collection do
           get :search

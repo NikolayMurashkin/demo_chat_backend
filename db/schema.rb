@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_02_122000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_08_111500) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -100,12 +100,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_02_122000) do
   create_table "room_memberships", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "last_read_at"
+    t.datetime "marked_unread_at"
+    t.datetime "muted_at"
+    t.datetime "pinned_at"
     t.integer "room_id", null: false
     t.datetime "updated_at", null: false
     t.integer "user_id", null: false
     t.boolean "visible", default: true, null: false
     t.index ["room_id", "user_id"], name: "index_room_memberships_on_room_id_and_user_id", unique: true
     t.index ["room_id"], name: "index_room_memberships_on_room_id"
+    t.index ["user_id", "pinned_at"], name: "index_room_memberships_on_user_id_and_pinned_at"
     t.index ["user_id", "visible"], name: "index_room_memberships_on_user_id_and_visible"
     t.index ["user_id"], name: "index_room_memberships_on_user_id"
   end
