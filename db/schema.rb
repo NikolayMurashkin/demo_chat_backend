@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_08_144000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_09_112500) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -90,16 +90,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_08_144000) do
     t.datetime "created_at", null: false
     t.datetime "deleted_at"
     t.datetime "edited_at"
+    t.datetime "expires_at"
     t.string "forwarded_from_external_id"
     t.string "forwarded_from_name"
     t.text "link_preview"
     t.datetime "pinned_at"
     t.text "plain_body"
+    t.text "quote_text"
     t.integer "reply_to_id"
     t.integer "room_id", null: false
+    t.boolean "silent", default: false, null: false
     t.integer "thread_root_id"
     t.datetime "updated_at", null: false
     t.integer "user_id", null: false
+    t.boolean "view_once", default: false, null: false
+    t.index ["expires_at"], name: "index_messages_on_expires_at"
     t.index ["reply_to_id"], name: "index_messages_on_reply_to_id"
     t.index ["room_id", "pinned_at"], name: "index_messages_on_room_id_and_pinned_at"
     t.index ["room_id"], name: "index_messages_on_room_id"
@@ -109,17 +114,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_08_144000) do
   end
 
   create_table "room_memberships", force: :cascade do |t|
+    t.datetime "archived_at"
     t.datetime "created_at", null: false
     t.datetime "last_read_at"
     t.datetime "marked_unread_at"
     t.datetime "muted_at"
     t.datetime "pinned_at"
     t.integer "room_id", null: false
+    t.string "theme"
     t.datetime "updated_at", null: false
     t.integer "user_id", null: false
     t.boolean "visible", default: true, null: false
     t.index ["room_id", "user_id"], name: "index_room_memberships_on_room_id_and_user_id", unique: true
     t.index ["room_id"], name: "index_room_memberships_on_room_id"
+    t.index ["user_id", "archived_at"], name: "index_room_memberships_on_user_id_and_archived_at"
     t.index ["user_id", "pinned_at"], name: "index_room_memberships_on_user_id_and_pinned_at"
     t.index ["user_id", "visible"], name: "index_room_memberships_on_user_id_and_visible"
     t.index ["user_id"], name: "index_room_memberships_on_user_id"
@@ -129,12 +137,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_08_144000) do
     t.string "avatar_url"
     t.datetime "created_at", null: false
     t.string "dm_key"
+    t.string "invite_token"
     t.string "name"
     t.integer "owner_id"
+    t.integer "parent_id"
     t.integer "saved_for_id"
+    t.integer "ttl_seconds"
     t.datetime "updated_at", null: false
     t.index ["dm_key"], name: "index_rooms_on_dm_key", unique: true
+    t.index ["invite_token"], name: "index_rooms_on_invite_token", unique: true
     t.index ["owner_id"], name: "index_rooms_on_owner_id"
+    t.index ["parent_id"], name: "index_rooms_on_parent_id"
     t.index ["saved_for_id"], name: "index_rooms_on_saved_for_id", unique: true
   end
 
