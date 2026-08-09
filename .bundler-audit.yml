@@ -1,0 +1,4 @@
+# A finding may be ignored only when it is demonstrably inapplicable and has a linked technical-
+# debt ticket. Keeping the list empty makes new advisories fail the build by default.
+---
+ignore: []

@@ -1,7 +1,7 @@
 source "https://rubygems.org"
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
-gem "rails", "~> 8.1.2"
+gem "rails", "~> 8.1.3", ">= 8.1.3.1"
 # Use sqlite3 as the database for Active Record (development/test)
 gem "sqlite3", ">= 1.4"
 # Postgres — durable-БД в production (Render free Postgres переживает сон/редеплой, в отличие от эфемерной ФС)
@@ -37,6 +37,9 @@ group :development, :test do
 
   # Static analysis for security vulnerabilities [https://brakemanscanner.org/]
   gem "brakeman", require: false
+
+  # Check the lockfile for published vulnerable dependencies.
+  gem "bundler-audit", "~> 0.9", require: false
 
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false

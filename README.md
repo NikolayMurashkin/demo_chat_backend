@@ -18,6 +18,8 @@ bundle exec rspec                 # test suite
 COVERAGE=1 bundle exec rspec      # test suite with SimpleCov report
 bin/rubocop                       # Ruby and RSpec style checks
 bin/brakeman --no-pager           # Rails static security scan
+bin/bundler-audit check --update  # vulnerable dependency audit
 ```
 
-GitHub Actions runs these checks for pull requests and pushes to `main`.
+GitHub Actions runs these checks for pull requests and pushes to `main`. Dependabot keeps Bundler
+dependencies and GitHub Actions up to date.
