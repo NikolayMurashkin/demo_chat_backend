@@ -13,7 +13,12 @@ Rails.application.routes.draw do
     # Пересылка кросс-комнатная, поэтому вне вложенного ресурса комнаты.
     post "messages/forward", to: "messages#forward"
     post "messages/:id/save", to: "messages#save"
+    post "messages/:id/view", to: "messages#view"
     post "rooms/saved", to: "rooms#saved"
+
+    # Приглашение по ссылке: токен вместо id комнаты, поэтому маршрут отдельный от rooms.
+    get "invites/:token", to: "invites#show", constraints: {token: %r{[^/]+}}
+    post "invites/:token/join", to: "invites#join", constraints: {token: %r{[^/]+}}
 
     resources :rooms, only: %i[index show create update destroy] do
       collection do
@@ -23,6 +28,12 @@ Rails.application.routes.draw do
       member do
         post :block, to: "blocks#create"
         delete :block, to: "blocks#destroy"
+        # Срок жизни исчезающих сообщений задаёт любой участник, а не только создатель группы:
+        # это настройка переписки, а не её оформления.
+        patch :ttl, to: "rooms#update_ttl"
+        post :invite, to: "invites#create"
+        delete :invite, to: "invites#destroy"
+        post :channels, to: "channels#create"
       end
 
       # Приглушение, закрепление и ручная пометка «непрочитано» — настройки участника, не комнаты.
@@ -35,6 +46,8 @@ Rails.application.routes.draw do
 
         member do
           get :thread
+          # Кто уже прочитал сообщение — список имён под галочками «прочитано».
+          get :readers
         end
       end
 

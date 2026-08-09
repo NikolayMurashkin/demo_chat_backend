@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_09_112500) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_09_135000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -83,6 +83,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_09_112500) do
     t.index ["message_id", "user_id", "emoji"], name: "index_message_reactions_on_message_id_and_user_id_and_emoji", unique: true
     t.index ["message_id"], name: "index_message_reactions_on_message_id"
     t.index ["user_id"], name: "index_message_reactions_on_user_id"
+  end
+
+  create_table "message_views", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "message_id", null: false
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.index ["message_id", "user_id"], name: "index_message_views_on_message_id_and_user_id", unique: true
+    t.index ["message_id"], name: "index_message_views_on_message_id"
+    t.index ["user_id"], name: "index_message_views_on_user_id"
   end
 
   create_table "messages", force: :cascade do |t|
@@ -196,6 +206,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_09_112500) do
   add_foreign_key "message_mentions", "users"
   add_foreign_key "message_reactions", "messages"
   add_foreign_key "message_reactions", "users"
+  add_foreign_key "message_views", "messages"
+  add_foreign_key "message_views", "users"
   add_foreign_key "messages", "messages", column: "reply_to_id"
   add_foreign_key "messages", "messages", column: "thread_root_id"
   add_foreign_key "messages", "rooms"
