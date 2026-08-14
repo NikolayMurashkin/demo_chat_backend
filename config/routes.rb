@@ -13,7 +13,12 @@ Rails.application.routes.draw do
     # Пересылка кросс-комнатная, поэтому вне вложенного ресурса комнаты.
     post "messages/forward", to: "messages#forward"
     post "messages/:id/save", to: "messages#save"
+    # Личная отметка «важное» и раскрытие одноразового сообщения адресуются самому сообщению:
+    # обе ручки работают с сообщением из любой доступной пользователю комнаты.
+    post "messages/:id/star", to: "messages#star"
+    delete "messages/:id/star", to: "messages#unstar"
     post "messages/:id/view", to: "messages#view"
+    get "starred_messages", to: "starred_messages#index"
     post "rooms/saved", to: "rooms#saved"
 
     # Приглашение по ссылке: токен вместо id комнаты, поэтому маршрут отдельный от rooms.

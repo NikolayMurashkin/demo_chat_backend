@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_09_135000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_14_213000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -176,6 +176,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_09_135000) do
     t.index ["user_id"], name: "index_scheduled_messages_on_user_id"
   end
 
+  create_table "starred_messages", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "message_id", null: false
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.index ["message_id"], name: "index_starred_messages_on_message_id"
+    t.index ["user_id", "created_at"], name: "index_starred_messages_on_user_id_and_created_at"
+    t.index ["user_id", "message_id"], name: "index_starred_messages_on_user_id_and_message_id", unique: true
+    t.index ["user_id"], name: "index_starred_messages_on_user_id"
+  end
+
   create_table "user_blocks", force: :cascade do |t|
     t.integer "blocked_id", null: false
     t.integer "blocker_id", null: false
@@ -217,6 +228,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_09_135000) do
   add_foreign_key "rooms", "users", column: "saved_for_id"
   add_foreign_key "scheduled_messages", "rooms"
   add_foreign_key "scheduled_messages", "users"
+  add_foreign_key "starred_messages", "messages"
+  add_foreign_key "starred_messages", "users"
   add_foreign_key "user_blocks", "users", column: "blocked_id"
   add_foreign_key "user_blocks", "users", column: "blocker_id"
 end
