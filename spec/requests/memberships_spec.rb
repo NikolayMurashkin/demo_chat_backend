@@ -97,6 +97,43 @@ RSpec.describe "Chat membership settings" do
     expect(room_summaries(user).map { |room| room.fetch("id") }).to eq([quiet.id, busy.id])
   end
 
+  it "marks the whole chat read without opening it" do
+    user = create(:user)
+    peer = create(:user)
+    room = group_with(user, peer)
+    create(:message, room: room, user: peer)
+    patch_membership(user, room, marked_unread: true)
+
+    post "/api/rooms/#{room.id}/membership/read", params: identity(user)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.parsed_body).to include("marked_unread" => false)
+    expect(room_summaries(user).first).to include("unread_count" => 0, "marked_unread" => false)
+  end
+
+  it "keeps unread messages of other chats after marking one read" do
+    user = create(:user)
+    peer = create(:user)
+    read_room = group_with(user, peer)
+    other_room = group_with(user, peer)
+    create(:message, room: read_room, user: peer)
+    create(:message, room: other_room, user: peer)
+
+    post "/api/rooms/#{read_room.id}/membership/read", params: identity(user)
+
+    counts = room_summaries(user).to_h { |room| [room.fetch("id"), room.fetch("unread_count")] }
+    expect(counts).to eq(read_room.id => 0, other_room.id => 1)
+  end
+
+  it "refuses to mark a room the user does not belong to as read" do
+    outsider = create(:user)
+    room = group_with(create(:user), create(:user))
+
+    post "/api/rooms/#{room.id}/membership/read", params: identity(outsider)
+
+    expect(response).to have_http_status(:not_found)
+  end
+
   it "refuses a room the user does not belong to" do
     outsider = create(:user)
     room = group_with(create(:user), create(:user))

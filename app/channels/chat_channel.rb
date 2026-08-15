@@ -71,17 +71,9 @@ class ChatChannel < ApplicationCable::Channel
     # обнуляться раньше, чем собеседники переставали писать.
     return unless allow_action?(:read, limit: 90, period: 60)
 
-    membership = room.membership_for(current_user)
     # Ручная пометка «непрочитано» держится ровно до открытия чата — как в телеге.
-    membership&.update(last_read_at: Time.current, marked_unread_at: nil)
-    room.broadcast_chat_event({
-      type: "read",
-      room_id: room.id,
-      reader_external_id: current_user.external_id,
-      last_read_at: membership&.last_read_at&.iso8601
-    })
-    # Свой бейдж непрочитанных обнуляем (счётчик пересчитается на списке чатов).
-    room.notify_activity(only: current_user)
+    # Сама отметка живёт в модели: тем же переходом пользуется REST-действие из списка чатов.
+    room.mark_read_for(current_user)
   end
 
   # Клиент прислал { action: "typing", kind: "voice", active: false } — рассылаем, чем занят

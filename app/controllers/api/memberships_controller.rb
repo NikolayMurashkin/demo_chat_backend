@@ -34,6 +34,17 @@ module Api
       render json: membership_json(membership)
     end
 
+    # POST /api/rooms/:room_id/membership/read — отметить чат прочитанным, не открывая его.
+    # Двигает last_read_at на «сейчас»: непрочитанные обнуляются одним действием, чего
+    # снятием ручной пометки не добиться — её отсутствие не делает сообщения прочитанными.
+    def read
+      room = current_user.rooms.find(params[:room_id])
+      membership = room.mark_read_for(current_user)
+      return render json: {error: "not_found"}, status: :not_found unless membership
+
+      render json: membership_json(membership)
+    end
+
     private
 
     def membership_json(membership)

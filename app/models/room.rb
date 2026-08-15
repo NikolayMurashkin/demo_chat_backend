@@ -149,6 +149,26 @@ class Room < ApplicationRecord
     room_memberships.find_by(user_id: user.id)
   end
 
+  # Отметка «прочитано»: одна на оба входа — открытый чат шлёт её по WS, а из списка чатов
+  # приходит REST-действие «отметить прочитанным». Ручная пометка «непрочитано» снимается
+  # здесь же: она держится ровно до прочтения.
+  def mark_read_for(user)
+    membership = membership_for(user)
+    membership&.update(last_read_at: Time.current, marked_unread_at: nil)
+
+    # Автору его сообщения становятся «прочитано», а список чатов на других вкладках
+    # того же пользователя теряет бейдж.
+    broadcast_chat_event({
+      type: "read",
+      room_id: id,
+      reader_external_id: user.external_id,
+      last_read_at: membership&.last_read_at&.iso8601
+    })
+    notify_activity(only: user)
+
+    membership
+  end
+
   # Непрочитанные для юзера: чужие сообщения новее его last_read_at (или все, если ещё не читал).
   # Удалённые и скрытые блокировкой не считаем — иначе бейдж зовёт в чат, где показывать нечего,
   # и расходится со списком чатов, который считает то же самое одним запросом на все комнаты.
