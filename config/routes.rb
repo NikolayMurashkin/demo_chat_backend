@@ -21,9 +21,17 @@ Rails.application.routes.draw do
     get "starred_messages", to: "starred_messages#index"
     post "rooms/saved", to: "rooms#saved"
 
+    # Папки чатов — личные вкладки над списком диалогов.
+    resources :chat_folders, only: %i[index create update destroy]
+
     # Приглашение по ссылке: токен вместо id комнаты, поэтому маршрут отдельный от rooms.
     get "invites/:token", to: "invites#show", constraints: {token: %r{[^/]+}}
     post "invites/:token/join", to: "invites#join", constraints: {token: %r{[^/]+}}
+
+    # Голос и закрытие адресуются опросу, а не комнате: голосующий приходит из любого чата,
+    # где ему это сообщение видно.
+    post "polls/:id/votes", to: "polls#vote"
+    post "polls/:id/close", to: "polls#close"
 
     resources :rooms, only: %i[index show create update destroy] do
       collection do
@@ -43,6 +51,9 @@ Rails.application.routes.draw do
 
       # Приглушение, закрепление и ручная пометка «непрочитано» — настройки участника, не комнаты.
       patch "membership", to: "memberships#update"
+
+      # Опрос создаётся в комнате: он приезжает обычным сообщением её ленты.
+      resources :polls, only: %i[create]
 
       resources :messages, only: %i[index create] do
         collection do
