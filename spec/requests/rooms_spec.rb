@@ -69,6 +69,22 @@ RSpec.describe "Chat rooms" do
     end
   end
 
+  describe "PATCH /api/rooms/:id" do
+    it "clears an uploaded group avatar, not only the avatar_url" do
+      owner = create(:user)
+      room = Room.create!(name: "Команда", owner: owner)
+      room.add_member(owner)
+      room.avatar.attach(io: StringIO.new("png"), filename: "group.png", content_type: "image/png")
+
+      patch "/api/rooms/#{room.id}",
+        params: {external_id: owner.external_id, name: owner.name, avatar_url: nil}
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["avatar_url"]).to be_nil
+      expect(room.reload.avatar).not_to be_attached
+    end
+  end
+
   describe "POST /api/rooms/saved" do
     it "returns one personal saved room for the current user" do
       user = create(:user)

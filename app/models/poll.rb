@@ -29,6 +29,11 @@ class Poll < ApplicationRecord
     poll_votes.map(&:user_id).uniq.size
   end
 
+  # Свой голос участник отдаёт один раз — второй запрос опрос уже не принимает.
+  def voted_by?(user)
+    poll_votes.exists?(user: user)
+  end
+
   def as_chat_json(viewer: nil)
     votes = poll_votes.to_a
     my_option_ids = viewer ? votes.select { |vote| vote.user_id == viewer.id }.map(&:poll_option_id) : []

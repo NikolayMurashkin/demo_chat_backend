@@ -39,7 +39,7 @@ RSpec.describe "Polls" do
     expect(response.parsed_body.fetch("error")).to eq("options_required")
   end
 
-  it "replaces the previous vote in a single-choice poll" do
+  it "keeps the first vote when the voter tries to change it" do
     author = create(:user)
     voter = create(:user)
     room = group_with(author, voter)
@@ -50,9 +50,9 @@ RSpec.describe "Polls" do
     post "/api/polls/#{poll_id}/votes", params: identity(voter).merge(option_ids: [first.id])
     post "/api/polls/#{poll_id}/votes", params: identity(voter).merge(option_ids: [second.id])
 
-    expect(response).to have_http_status(:ok), response.body
-    expect(poll.poll_votes.where(user: voter).pluck(:poll_option_id)).to eq([second.id])
-    expect(response.parsed_body.fetch("voters_count")).to eq(1)
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(response.parsed_body.fetch("error")).to eq("already_voted")
+    expect(poll.poll_votes.where(user: voter).pluck(:poll_option_id)).to eq([first.id])
   end
 
   it "keeps both answers in a multiple-choice poll" do

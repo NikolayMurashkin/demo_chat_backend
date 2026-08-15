@@ -54,6 +54,39 @@ RSpec.describe "Chat membership settings" do
     expect(summary).to include("muted" => true, "pinned" => false, "marked_unread" => true)
   end
 
+  it "keeps the chat theme personal and shows it in the room list" do
+    user = create(:user)
+    peer = create(:user)
+    room = group_with(user, peer)
+
+    patch_membership(user, room, theme: "graphite")
+
+    expect(response.parsed_body).to include("theme" => "graphite")
+    expect(room_summaries(user).first).to include("theme" => "graphite")
+    expect(room_summaries(peer).first).to include("theme" => RoomMembership::DEFAULT_THEME)
+  end
+
+  it "rejects a theme outside the known set" do
+    user = create(:user)
+    room = group_with(user, create(:user))
+
+    patch_membership(user, room, theme: "neon")
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(room.membership_for(user).theme_name).to eq(RoomMembership::DEFAULT_THEME)
+  end
+
+  it "archives the chat and returns it back" do
+    user = create(:user)
+    room = group_with(user, create(:user))
+
+    patch_membership(user, room, archived: true)
+    expect(room_summaries(user).first).to include("archived" => true)
+
+    patch_membership(user, room, archived: false)
+    expect(room_summaries(user).first).to include("archived" => false)
+  end
+
   it "puts pinned chats above fresher conversations" do
     user = create(:user)
     quiet = group_with(user, create(:user))

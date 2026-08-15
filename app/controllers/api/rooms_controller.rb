@@ -83,6 +83,10 @@ module Api
         return render json: {error: "invalid_avatar_url"}, status: :unprocessable_entity if params[:avatar_url].present? && avatar_url.nil?
 
         room.avatar_url = avatar_url
+        # Загруженная картинка перекрывает avatar_url, поэтому сброс обязан унести и её:
+        # иначе «убрать аватар» ничего не меняет, пока к комнате приложен файл. Сносим
+        # синхронно — ответ этого же запроса уже отдаёт комнату без аватара.
+        room.avatar.purge if avatar_url.nil? && avatar_upload.blank? && room.avatar.attached?
       end
       room.save!
       attach_avatar(room, avatar_upload, avatar_info) if avatar_upload.present?

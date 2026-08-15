@@ -23,12 +23,14 @@ module Api
     end
 
     # POST /api/polls/:id/votes { option_ids: [] }
-    # Повторный голос заменяет прежний: в обычном опросе — целиком, в опросе с несколькими
-    # ответами присланный набор и есть итоговый выбор.
+    # Голос отдаётся один раз: вместе с ним открываются результаты, и переголосование
+    # превратило бы опрос в гонку за большинством. В опросе с несколькими ответами
+    # присланный набор и есть весь выбор участника.
     def vote
       poll = accessible_poll
       return render json: {error: "not_found"}, status: :not_found unless poll
       return render json: {error: "poll_closed"}, status: :unprocessable_entity if poll.closed?
+      return render json: {error: "already_voted"}, status: :unprocessable_entity if poll.voted_by?(current_user)
       return render json: {error: "rate_limited"}, status: :too_many_requests unless allow_vote?
 
       option_ids = requested_option_ids(poll)
@@ -36,7 +38,6 @@ module Api
       return render json: {error: "single_choice_only"}, status: :unprocessable_entity if !poll.multiple && option_ids.size > 1
 
       Poll.transaction do
-        poll.poll_votes.where(user: current_user).destroy_all
         option_ids.each { |option_id| poll.poll_votes.create!(user: current_user, poll_option_id: option_id) }
       end
 
