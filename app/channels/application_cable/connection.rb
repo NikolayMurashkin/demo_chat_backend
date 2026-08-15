@@ -3,18 +3,26 @@
 module ApplicationCable
   class Connection < ActionCable::Connection::Base
     identified_by :current_user
-    MAX_CONNECTIONS_PER_USER = 5
-    MAX_CONNECTIONS_PER_IP_PER_MINUTE = 30
+    # Сколько сокетов одного человека держим одновременно. Лишние не отвергаем, а закрываем
+    # с самых старых: вкладок у человека бывает много, оборванный сокет сервер замечает не
+    # сразу, и жёсткий отказ запирал чат тому, кто просто несколько раз обновил страницу.
+    MAX_CONNECTIONS_PER_USER = 10
+    # Потолок по адресу — защита от одиночного флуда, а не от офиса. За корпоративным NAT
+    # весь этаж приходит с одного IP, и тесный общий бюджет запирал чат целой команде:
+    # успевшие подключиться работали, остальные не могли подключиться вообще.
+    MAX_CONNECTIONS_PER_IP_PER_MINUTE = 600
+    # Частота переподключений одного человека — вот она и должна ловить зациклившийся клиент.
+    MAX_CONNECTIONS_PER_USER_PER_MINUTE = 30
 
     def connect
       reject_unauthorized_connection unless allowed_websocket_origin?
-      reject_unauthorized_connection unless ChatRateLimiter.allow?(
-        "ws_connect:#{request.remote_ip}", limit: MAX_CONNECTIONS_PER_IP_PER_MINUTE, period: 60,
-      )
+      reject_overloaded_connection unless within_ip_rate_limit?
 
       self.current_user = find_verified_user
-      presence_state = Presence.connect(current_user.id, limit: MAX_CONNECTIONS_PER_USER)
-      reject_unauthorized_connection if presence_state.nil?
+      reject_overloaded_connection unless within_user_rate_limit?
+
+      close_extra_connections
+      presence_state = Presence.connect(current_user.id)
 
       @presence_registered = true
       # Первый сокет юзера — он «появился в сети»; всем, с кем есть общая комната, шлём событие.
@@ -37,6 +45,45 @@ module ApplicationCable
     end
 
     private
+
+    def within_ip_rate_limit?
+      ChatRateLimiter.allow?("ws_connect:#{request.remote_ip}", limit: MAX_CONNECTIONS_PER_IP_PER_MINUTE, period: 60)
+    end
+
+    def within_user_rate_limit?
+      ChatRateLimiter.allow?(
+        "ws_connect_user:#{current_user.id}", limit: MAX_CONNECTIONS_PER_USER_PER_MINUTE, period: 60,
+      )
+    end
+
+    # Перегрузка — не отказ в доступе. reject_unauthorized_connection закрывает сокет с
+    # reconnect: false, и клиент больше не пытается подключиться: чат оставался мёртвым до
+    # перезагрузки страницы, хотя сервер был готов принять его через минуту. Здесь закрываем
+    # с reconnect: true — клиент вернётся сам, по своей выдержке.
+    def reject_overloaded_connection
+      close(reason: "server_busy", reconnect: true) if websocket.alive?
+      # Прерываем connect. Ответный close из обработчика уже не уйдёт: сокет закрыт выше.
+      raise ActionCable::Connection::Authorization::UnauthorizedError
+    end
+
+    # Место новому подключению освобождаем сами, закрывая самые старые сокеты этого же юзера.
+    # Забытая вкладка не должна мешать той, в которой человек сейчас работает.
+    def close_extra_connections
+      # Реестр открытых сокетов есть только у настоящего сервера: под тестовым соединением
+      # вытеснять нечего, а сам connect должен отработать как обычно.
+      registry = server&.connections
+      return if registry.nil?
+
+      # Список меняется из других потоков — работаем по копии.
+      peers = registry.dup.select { |connection| connection.current_user&.id == current_user.id }
+      extra = peers.size - MAX_CONNECTIONS_PER_USER + 1
+      return if extra <= 0
+
+      peers
+        .sort_by { |connection| connection.statistics[:started_at].to_i }
+        .first(extra)
+        .each { |connection| connection.close(reason: "replaced_by_newer_tab", reconnect: false) }
+    end
 
     # Демо-идентификация: личность приходит в query-параметрах cable-URL
     # (?external_id=...&name=...). В проде здесь была бы валидация токена.

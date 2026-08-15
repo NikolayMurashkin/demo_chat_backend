@@ -11,12 +11,13 @@ module Presence
   SOCKETS = Hash.new(0)
 
   class << self
-    # :first, если это первый сокет; :connected для дополнительной вкладки; nil при лимите.
-    # Лимит не даёт одному external_id удерживать worker pool тысячами вкладок.
-    def connect(user_id, limit:)
+    # :first, если это первый сокет юзера; :connected для дополнительной вкладки.
+    # Счётчик именно считает и никого не отвергает: число вкладок ограничивает Connection,
+    # закрывая самые старые сокеты. Отказ здесь запирал человека до перезапуска процесса —
+    # оборванные соединения (уснувший ноутбук, пропавшая сеть) сервер замечает не мгновенно,
+    # и накопленные «фантомы» не давали подключиться заново.
+    def connect(user_id)
       MUTEX.synchronize do
-        return if SOCKETS[user_id] >= limit
-
         SOCKETS[user_id] += 1
         SOCKETS[user_id] == 1 ? :first : :connected
       end
