@@ -108,3 +108,44 @@ deploy:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: manual
+
+# Перенос переписки с Render. Запускается один раз, вручную, ПОСЛЕ первого удачного деплоя.
+#
+# Работа идёт изнутри кластера: временный под тянет дамп с Render и заливает его в нашу БД,
+# поэтому ни kubectl, ни postgresql-client на машине не нужны. Адрес источника лежит в
+# переменной проекта RENDER_DATABASE_URL (External Database URL, masked).
+#
+# Всё, что было в чате ПОСЛЕ снятия дампа, потеряется: переносить нужно тогда, когда в старом
+# чате уже не пишут. Вложения переезжают вместе с дампом — они лежат строками в той же БД.
+migrate-from-render:
+  stage: deploy
+  image: sanbusrt/helm-deployer:kubedog-custom1
+  needs: ["deploy"]
+  resource_group: chat-demo
+  before_script:
+    - echo "$YC_KEY" > key.json
+    - yc config profile create sa-profile
+    - yc config set service-account-key key.json
+    - yc config set cloud-id ${YC_CLOUD_ID}
+    - yc config set folder-id ${YC_FOLDER_ID}
+    - yc managed-kubernetes cluster get-credentials ${KUBE_CLUSTER} --internal
+  script:
+    - set -e
+    - test -n "${RENDER_DATABASE_URL}" || (echo "Нет переменной RENDER_DATABASE_URL" && exit 1)
+    - TARGET_URL=$(kubectl -n "${NAMESPACE}" get secret "${HELM_RELEASE}-postgres" -o jsonpath='{.data.url}' | base64 -d)
+    # --clean --if-exists: схему в целевой БД уже накатили миграции при старте, и без сноса
+    # существующих таблиц восстановление упало бы на первом же конфликте.
+    - kubectl -n "${NAMESPACE}" run pg-migrate-${CI_JOB_ID} --rm -i --restart=Never
+      --image=postgres:17-alpine
+      --env="SRC=${RENDER_DATABASE_URL}"
+      --env="DST=${TARGET_URL}"
+      --command -- sh -c 'pg_dump --no-owner --no-privileges -Fc "$SRC" | pg_restore --clean --if-exists --no-owner --no-privileges -d "$DST"'
+    # Перезапуск не обязателен для данных, но сбрасывает кэши и пул соединений — после
+    # подмены содержимого БД это дешевле, чем ловить странности на показе.
+    - kubectl -n "${NAMESPACE}" rollout restart deploy/${HELM_RELEASE}
+    - kubectl -n "${NAMESPACE}" rollout status deploy/${HELM_RELEASE} --timeout=5m
+  after_script:
+    - rm -f key.json
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
