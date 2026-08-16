@@ -72,7 +72,7 @@ module Api
     end
 
     def allow_join?
-      ChatRateLimiter.allow?("invite_join:#{current_user.id}:#{request.remote_ip}", limit: 10, period: 60)
+      ChatRateLimiter.allow?("invite_join:#{current_user.id}", **ChatLimits.rate(:invite_join))
     end
   end
 end

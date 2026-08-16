@@ -14,6 +14,21 @@ RSpec.describe ChatChannel do
     stub_connection(current_user: user)
   end
 
+  # Пять открытых чатов переподписываются на каждый реконнект, и прежние 30 подписок в минуту
+  # выедались обычной работой. Отказ терминален — комната оставалась мёртвой до перезагрузки.
+  it "keeps confirming a room subscription however often the socket reconnects" do
+    owner = create(:user)
+    member = create(:user)
+    room = group_with(owner, member)
+
+    connect_as(member)
+
+    40.times do
+      subscribe(room_id: room.id)
+      expect(subscription).to be_confirmed
+    end
+  end
+
   it "rejects a subscription to a room the user does not belong to" do
     outsider = create(:user)
     room = group_with(create(:user), create(:user))

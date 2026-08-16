@@ -16,15 +16,25 @@ class ChatRateLimiter
     def allow?(key, limit:, period:)
       now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
-      @mutex.synchronize do
+      allowed = @mutex.synchronize do
         prune!(now)
         bucket = (@buckets[key] ||= [])
         bucket.reject! { |timestamp| timestamp <= now - period }
-        return false if bucket.size >= limit
-
-        bucket << now
-        true
+        if bucket.size >= limit
+          false
+        else
+          bucket << now
+          true
+        end
       end
+
+      # Отсечка обязана быть видимой. Пока её не было в логах, сломанный чат выглядел как
+      # «бэкенд не вывозит»: клиент про упёршийся лимит не узнаёт, кадр просто не доезжает,
+      # и разбираться приходится по описанию симптомов. Пишем вне мьютекса — логгер сам
+      # ходит в I/O, и держать на нём общий замок незачем.
+      Rails.logger.warn("ChatRateLimiter: превышен лимит #{key} (#{limit} за #{period} с)") unless allowed
+
+      allowed
     end
 
     # Счётчики живут в процессе и переживают отдельный пример теста: без сброса примеры

@@ -10,9 +10,14 @@ class UserChannel < ApplicationCable::Channel
   # Персональный канал юзера (не привязан к комнате). Клиент подписывается один раз на сессию
   # и получает лёгкие сигналы { type: "rooms_changed" } — повод перезапросить список чатов
   # и пересчитать бейдж непрочитанных, даже когда нужный чат не открыт.
+  # Подписка НЕ ограничивается по частоте, и это осознанно. Клиент подписывается заново на
+  # каждый реконнект и на каждую перезагрузку страницы — то есть ровно тогда, когда человек
+  # ничего не контролирует. Прежний потолок в десять подписок в минуту выедался за минуту
+  # отладки, а отказ терминален: клиент отклонённую подписку не повторяет. Дальше человек
+  # сидел с живым на вид сокетом и мёртвым личным каналом — без входящих звонков и без
+  # обновления списка чатов, до перезагрузки вкладки. Дорогого здесь ничего нет: stream_for
+  # лишь заводит подписку на pub/sub, а частоту самих подключений ограничивает Connection.
   def subscribed
-    return reject unless ChatRateLimiter.allow?("ws:user_subscribe:#{current_user.id}:#{connection.remote_ip}", limit: 10, period: 60)
-
     stream_for current_user
   end
 
@@ -27,15 +32,14 @@ class UserChannel < ApplicationCable::Channel
   # держать нужный чат открытым, а на UserChannel он подписан всю сессию.
   def call_signal(data)
     return unless CALL_SIGNALS.include?(data["type"])
-    limit, period = call_rate_limit(data["type"])
-    return unless ChatRateLimiter.allow?("call:#{data['type']}:#{current_user.id}:#{connection.remote_ip}", limit: limit, period: period)
     return unless valid_call_id?(data["call_id"])
+    return reject_call_signal(data, "rate_limited") unless within_call_rate_limit?(data)
 
     peer = callable_peer(data["to_external_id"], data["room_id"])
-    return unless peer
+    return reject_call_signal(data, "peer_unavailable") unless peer
 
     payload = safe_payload(data["type"], data["payload"])
-    return if payload == :invalid
+    return reject_call_signal(data, "invalid_payload") if payload == :invalid
 
     UserChannel.broadcast_to(peer, {
       type: data["type"],
@@ -68,12 +72,36 @@ class UserChannel < ApplicationCable::Channel
     value.to_s.match?(CALL_ID_PATTERN)
   end
 
-  def call_rate_limit(type)
-    case type
-    when "call_ice" then [90, 60]
-    when "call_invite", "call_accept" then [12, 60]
-    else [20, 60]
+  # ICE считаем на конкретный звонок, остальное — на человека. Кандидатов столько, сколько у
+  # машины сетевых интерфейсов: на ноутбуке с VPN и виртуальными адаптерами их десятки, и
+  # минутный бюджет выедала вторая попытка дозвона. Отбрасывались при этом ПОСЛЕДНИЕ кандидаты,
+  # то есть srflx — единственные, которыми соединяются разные сети; звонок деградировал до
+  # «работает только внутри одной локалки». Ключ звонка нельзя брать голым: call_id приходит от
+  # клиента, поэтому в него добавлен id отправителя — чужим call_id бюджет не обнулить.
+  def within_call_rate_limit?(data)
+    type = data["type"]
+
+    if type == "call_ice"
+      ChatRateLimiter.allow?("call_ice:#{current_user.id}:#{data['call_id']}", **ChatLimits.rate(:call_ice))
+    else
+      name = %w[call_invite call_accept].include?(type) ? :call_setup : :call_control
+      ChatRateLimiter.allow?("call:#{type}:#{current_user.id}", **ChatLimits.rate(name))
     end
+  end
+
+  # Молчать в ответ на отброшенный сигнал нельзя: звонящий видит гудки, вызываемый — тишину,
+  # и снаружи это неотличимо от неисправной сети. Причину возвращаем отправителю, чтобы
+  # клиент показал внятный текст и не ждал таймаута впустую.
+  def reject_call_signal(data, reason)
+    transmit({
+      type: "call_signal_rejected",
+      call_id: data["call_id"].to_s,
+      room_id: data["room_id"].to_i,
+      signal_type: data["type"],
+      reason: reason
+    })
+
+    nil
   end
 
   def safe_payload(type, value)

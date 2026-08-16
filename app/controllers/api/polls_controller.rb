@@ -100,11 +100,11 @@ module Api
     end
 
     def allow_create?
-      ChatRateLimiter.allow?("poll_create:#{current_user.id}", limit: 10, period: 60)
+      ChatRateLimiter.allow?("poll_create:#{current_user.id}", **ChatLimits.rate(:poll_create))
     end
 
     def allow_vote?
-      ChatRateLimiter.allow?("poll_vote:#{current_user.id}", limit: 60, period: 60)
+      ChatRateLimiter.allow?("poll_vote:#{current_user.id}", **ChatLimits.rate(:poll_vote))
     end
 
     def render_chat_blocked

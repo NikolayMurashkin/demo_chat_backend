@@ -3,16 +3,6 @@
 module ApplicationCable
   class Connection < ActionCable::Connection::Base
     identified_by :current_user
-    # Сколько сокетов одного человека держим одновременно. Лишние не отвергаем, а закрываем
-    # с самых старых: вкладок у человека бывает много, оборванный сокет сервер замечает не
-    # сразу, и жёсткий отказ запирал чат тому, кто просто несколько раз обновил страницу.
-    MAX_CONNECTIONS_PER_USER = 10
-    # Потолок по адресу — защита от одиночного флуда, а не от офиса. За корпоративным NAT
-    # весь этаж приходит с одного IP, и тесный общий бюджет запирал чат целой команде:
-    # успевшие подключиться работали, остальные не могли подключиться вообще.
-    MAX_CONNECTIONS_PER_IP_PER_MINUTE = 600
-    # Частота переподключений одного человека — вот она и должна ловить зациклившийся клиент.
-    MAX_CONNECTIONS_PER_USER_PER_MINUTE = 30
 
     def connect
       reject_unauthorized_connection unless allowed_websocket_origin?
@@ -47,13 +37,11 @@ module ApplicationCable
     private
 
     def within_ip_rate_limit?
-      ChatRateLimiter.allow?("ws_connect:#{request.remote_ip}", limit: MAX_CONNECTIONS_PER_IP_PER_MINUTE, period: 60)
+      ChatRateLimiter.allow?("ws_connect:#{request.remote_ip}", **ChatLimits.rate(:ws_connect_ip))
     end
 
     def within_user_rate_limit?
-      ChatRateLimiter.allow?(
-        "ws_connect_user:#{current_user.id}", limit: MAX_CONNECTIONS_PER_USER_PER_MINUTE, period: 60,
-      )
+      ChatRateLimiter.allow?("ws_connect_user:#{current_user.id}", **ChatLimits.rate(:ws_connect_user))
     end
 
     # Перегрузка — не отказ в доступе. reject_unauthorized_connection закрывает сокет с
@@ -67,7 +55,9 @@ module ApplicationCable
     end
 
     # Место новому подключению освобождаем сами, закрывая самые старые сокеты этого же юзера.
-    # Забытая вкладка не должна мешать той, в которой человек сейчас работает.
+    # Забытая вкладка не должна мешать той, в которой человек сейчас работает. Потолок при этом
+    # держим заведомо выше живого сценария: пять компьютеров по три вкладки — это пятнадцать
+    # сокетов, и вытеснять там нечего.
     def close_extra_connections
       # Реестр открытых сокетов есть только у настоящего сервера: под тестовым соединением
       # вытеснять нечего, а сам connect должен отработать как обычно.
@@ -76,7 +66,7 @@ module ApplicationCable
 
       # Список меняется из других потоков — работаем по копии.
       peers = registry.dup.select { |connection| connection.current_user&.id == current_user.id }
-      extra = peers.size - MAX_CONNECTIONS_PER_USER + 1
+      extra = peers.size - ChatLimits.count(:sockets_per_user) + 1
       return if extra <= 0
 
       peers

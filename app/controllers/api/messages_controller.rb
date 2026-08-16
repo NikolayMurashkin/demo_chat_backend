@@ -222,20 +222,24 @@ module Api
 
     private
 
+    # Прежние пороги (шесть загрузок в минуту на адрес и четыре на человека) рассчитывались
+    # на одиночку с одним файлом. Живой сценарий другой: человек кидает подряд пачку фотографий,
+    # а за одним адресом их несколько — и общий адресный бюджет выедался за первую же минуту
+    # показа, после чего вложения переставали грузиться у всей команды.
     def throttle_upload
-      ip_allowed = ChatRateLimiter.allow?("upload_ip:#{request.remote_ip}", limit: 6, period: 60)
-      user_allowed = ChatRateLimiter.allow?("upload_user:#{current_user.id}", limit: 4, period: 60)
+      ip_allowed = ChatRateLimiter.allow?("upload_ip:#{request.remote_ip}", **ChatLimits.rate(:upload_ip))
+      user_allowed = ChatRateLimiter.allow?("upload_user:#{current_user.id}", **ChatLimits.rate(:upload_user))
       return if ip_allowed && user_allowed
 
-      render json: {error: "rate_limited"}, status: :too_many_requests
+      render_rate_limited
     end
 
     # Пересылка — единственная ручка, где один запрос порождает десятки сообщений сразу
     # в нескольких чужих чатах. Свой лимит держит её заметно ниже общего HTTP-потолка.
     def throttle_forward
-      return if ChatRateLimiter.allow?("forward:#{current_user.id}", limit: 10, period: 60)
+      return if ChatRateLimiter.allow?("forward:#{current_user.id}", **ChatLimits.rate(:forward))
 
-      render json: {error: "rate_limited"}, status: :too_many_requests
+      render_rate_limited
     end
 
     def render_chat_blocked

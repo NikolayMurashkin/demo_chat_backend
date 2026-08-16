@@ -11,9 +11,11 @@ class ChatChannel < ApplicationCable::Channel
   # Чем занят собеседник прямо сейчас. Всё неизвестное считаем набором текста.
   ACTIVITY_KINDS = %w[typing attachment voice].freeze
   # Клиент подписывается с { channel: "ChatChannel", room_id: 1 }.
+  # По частоте подписка не ограничивается — см. тот же разбор в UserChannel. Человек с пятью
+  # открытыми чатами переподписывает пять каналов на каждый реконнект, и прежние 30 в минуту
+  # выедались обычной работой, а не флудом. Отказ при этом терминален: комната оставалась
+  # мёртвой до перезагрузки страницы.
   def subscribed
-    return reject unless allow_subscription?
-
     # Только комнаты, где текущий юзер — участник (иначе reject_subscription).
     room = joined_room
     return reject unless room
@@ -36,7 +38,7 @@ class ChatChannel < ApplicationCable::Channel
 
     # Короткие реплики на демо часто отправляют серией. Старый лимит 20/мин молча
     # отбрасывал хвост серии, из-за чего у отправителя оставался только локальный пузырь.
-    return reject_message(room, data, "rate_limited") unless allow_action?(:message, limit: 60, period: 60)
+    return reject_message(room, data, "rate_limited") unless allow_action?(:message)
     return reject_message(room, data, "blocked") if room.direct_chat_blocked_for?(current_user)
 
     body = normalized_body(data["body"])
@@ -69,7 +71,7 @@ class ChatChannel < ApplicationCable::Channel
     # Отметка о прочтении уходит на каждое входящее и на возвращение во вкладку, поэтому
     # её потолок не ниже потолка отправки: иначе в оживлённой группе бейдж переставал
     # обнуляться раньше, чем собеседники переставали писать.
-    return unless allow_action?(:read, limit: 90, period: 60)
+    return unless allow_action?(:read)
 
     # Ручная пометка «непрочитано» держится ровно до открытия чата — как в телеге.
     # Сама отметка живёт в модели: тем же переходом пользуется REST-действие из списка чатов.
@@ -86,7 +88,7 @@ class ChatChannel < ApplicationCable::Channel
   def typing(data)
     room = joined_room
     return if room.nil?
-    return unless allow_action?(:typing, limit: 20, period: 10)
+    return unless allow_action?(:typing)
     return if room.direct_chat_blocked_for?(current_user)
 
     kind = data["kind"].to_s
@@ -109,7 +111,7 @@ class ChatChannel < ApplicationCable::Channel
   def toggle_reaction(data)
     room = joined_room
     return if room.nil?
-    return unless allow_action?(:reaction, limit: 30, period: 60)
+    return unless allow_action?(:reaction)
     return if room.direct_chat_blocked_for?(current_user)
 
     message = find_room_message(room, data["message_id"])
@@ -133,7 +135,7 @@ class ChatChannel < ApplicationCable::Channel
   def toggle_pin(data)
     room = joined_room
     return if room.nil?
-    return unless allow_action?(:pin, limit: 20, period: 60)
+    return unless allow_action?(:pin)
     return if room.direct_chat_blocked_for?(current_user)
 
     message = find_room_message(room, data["message_id"])
@@ -147,7 +149,7 @@ class ChatChannel < ApplicationCable::Channel
   def edit_message(data)
     room = joined_room
     return if room.nil?
-    return unless allow_action?(:edit, limit: 20, period: 60)
+    return unless allow_action?(:edit)
     return if room.direct_chat_blocked_for?(current_user)
 
     message = own_message(room, data["message_id"])
@@ -163,7 +165,7 @@ class ChatChannel < ApplicationCable::Channel
   def delete_message(data)
     room = joined_room
     return if room.nil?
-    return unless allow_action?(:delete, limit: 20, period: 60)
+    return unless allow_action?(:delete)
 
     # Удалять своё разрешено и в заблокированном диалоге: это не общение с собеседником,
     # а уборка за собой, и запрет оставлял бы человека без контроля над своими сообщениями.
@@ -234,14 +236,11 @@ class ChatChannel < ApplicationCable::Channel
     value if value.match?(CLIENT_MESSAGE_ID_PATTERN)
   end
 
-  def allow_action?(name, limit:, period:)
-    # Ключ склеен из id и IP не для красоты: id закрывает случайный флуд одного человека,
-    # а IP — цикл «новая личность → новое соединение», которым лимит по одному id обходится
-    # (личность в демо приходит с фронта, и завести следующую ничего не стоит).
-    ChatRateLimiter.allow?("ws:#{name}:#{current_user.id}:#{connection.remote_ip}", limit: limit, period: period)
-  end
-
-  def allow_subscription?
-    ChatRateLimiter.allow?("ws:subscribe:#{current_user.id}:#{connection.remote_ip}", limit: 30, period: 60)
+  # Ключ — по человеку, без IP. IP в ключе делал бюджет общим для всех, кто сидит за одним
+  # адресом: пять человек с одного Wi-Fi (или из одного VPN-выхода) душили друг друга, и чем
+  # активнее шло демо, тем хуже работал чат. Перебор личностей ограничивает Connection, а не
+  # каждое действие в отдельности.
+  def allow_action?(name)
+    ChatRateLimiter.allow?("ws:#{name}:#{current_user.id}", **ChatLimits.rate(name))
   end
 end

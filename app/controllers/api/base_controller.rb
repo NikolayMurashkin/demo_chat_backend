@@ -30,16 +30,24 @@ module Api
     def throttle_request
       return if within_rate_limits?
 
-      render json: {error: "rate_limited"}, status: :too_many_requests
+      render_rate_limited
     end
 
     # Лимит по адресу остаётся грубым потолком: external_id приходит от клиента, и без него
-    # бюджет обнулялся бы сменой личности. Но основной счёт ведём по пользователю — иначе два
-    # клиента за одним адресом (демо на одной машине, офисный NAT) делят лимит и глушат друг
-    # другу загрузку истории, а чат молча остаётся без обновлений.
+    # бюджет обнулялся бы сменой личности. Но основной счёт ведём по пользователю, и ключ
+    # берём БЕЗ адреса: за одним IP сидит вся команда (общий Wi-Fi, корпоративный NAT, выход
+    # VPN), и общий бюджет они выедали друг у друга — чем активнее шло демо, тем хуже
+    # работал чат у всех сразу.
     def within_rate_limits?
-      ChatRateLimiter.allow?("http_ip:#{request.remote_ip}", limit: 600, period: 60) &&
-        ChatRateLimiter.allow?("http:#{current_user.id}:#{request.remote_ip}", limit: 120, period: 60)
+      ChatRateLimiter.allow?("http_ip:#{request.remote_ip}", **ChatLimits.rate(:http_ip)) &&
+        ChatRateLimiter.allow?("http:#{current_user.id}", **ChatLimits.rate(:http_user))
+    end
+
+    # Retry-After — не украшение: без него клиент не отличает «слишком часто» от «сломалось»
+    # и либо сдаётся, либо долбит ручку дальше, дожигая тот же бюджет.
+    def render_rate_limited(retry_after: 5)
+      response.set_header("Retry-After", retry_after.to_s)
+      render json: {error: "rate_limited", retry_after: retry_after}, status: :too_many_requests
     end
 
     # online/last_seen_at едут прямо в составе участников: отдельная ручка presence не нужна,
