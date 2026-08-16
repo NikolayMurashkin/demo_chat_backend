@@ -63,9 +63,14 @@ Rails.application.configure do
   public_uri = URI.parse(public_url.to_s)
   raise "CHAT_PUBLIC_URL or RENDER_EXTERNAL_URL must contain the public HTTPS backend URL" unless public_uri.is_a?(URI::HTTPS) && public_uri.host.present?
 
-  # Не позволяем подменённому Host влиять на маршрутизацию/редиректы. Health check Render идёт
-  # на тот же публичный hostname.
+  # Не позволяем подменённому Host влиять на маршрутизацию/редиректы.
   config.hosts = [ public_uri.host ]
+
+  # Проба живости приходит не с публичного адреса: в Kubernetes kubelet стучится прямо на IP
+  # пода, и такой запрос отвергается проверкой Host — под не проходит readiness и уходит в
+  # бесконечный перезапуск, хотя приложение исправно. Health check — единственная ручка, где
+  # Host не важен: она ничего не отдаёт и никуда не редиректит.
+  config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
 
   # Через этот пул проходят ВСЕ операции канала — connect, subscribe, receive и рассылка
   # broadcast'ов подписчикам. Дефолтных 4 потоков хватает на пару человек: на группе

@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}
+type: Opaque
+stringData:
+  RAILS_MASTER_KEY: {{ required "secrets.RAILS_MASTER_KEY обязателен: без него production не поднимется" .Values.secrets.RAILS_MASTER_KEY | quote }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  # Recreate, а не RollingUpdate: при обновлении две реплики жили бы одновременно, а шина
+  # ActionCable у них не общая — часть сообщений не дошла бы до половины собеседников.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+      annotations:
+        # Перезапуск пода при смене конфигурации: иначе правка лимитов или CORS осталась бы
+        # лежать в манифесте, не доехав до работающего процесса.
+        checksum/config: {{ toYaml .Values.env | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecret }}
+      imagePullSecrets:
+        - name: {{ . | quote }}
+      {{- end }}
+      containers:
+        - name: api
+          image: {{ printf "%s:%s" (required "image.repository обязателен" .Values.image.repository) (required "image.tag обязателен" .Values.image.tag) | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.containerPort }}
+          env:
+            - name: PORT
+              value: {{ .Values.containerPort | quote }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-postgres
+                  key: url
+            - name: RAILS_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}
+                  key: RAILS_MASTER_KEY
+            {{- range $name, $value := .Values.env }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- range $name, $value := .Values.limits }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
+          # Миграции накатывает bin/docker-entrypoint при старте, и на пустой БД это занимает
+          # заметно больше обычного запуска — стартовая проба даёт на это время, не забирая
+          # его у liveness.
+          startupProbe:
+            httpGet:
+              path: /up
+              port: http
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /up
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /up
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      # Открытые сокеты закрываем не мгновенно: у клиента есть пара секунд переподключиться
+      # к новому поду, не показав человеку разрыв связи.
+      terminationGracePeriodSeconds: 30

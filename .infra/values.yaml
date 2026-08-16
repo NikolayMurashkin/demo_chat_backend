@@ -1,0 +1,73 @@
+# image.repository / image.tag и публичный хост подставляет CI при деплое.
+image:
+  repository: ""
+  tag: ""
+  pullPolicy: IfNotPresent
+# Pull-secret для cr.yandex создаёт сама джоба deploy в целевом namespace.
+imagePullSecret: yc-registry
+
+# Реплика ровно одна, и это не экономия. Шина ActionCable в production — async, то есть живёт
+# в памяти процесса: вторая реплика не увидит broadcast'ы первой. Там же живут presence
+# («в сети») и счётчики лимитов. Масштабирование начинается с Redis, а не с replicaCount.
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+service:
+  port: 80
+
+containerPort: 3000
+
+ingress:
+  className: nginx
+  host: ""
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    # Вложения — до 25 МиБ на сообщение, а nginx по умолчанию рвёт запрос уже на первом
+    # мегабайте, отдавая 413 вместо загрузки.
+    nginx.ingress.kubernetes.io/proxy-body-size: 30m
+    # WebSocket живёт часами, а дефолтный минутный таймаут закрывал бы его на каждой паузе
+    # в разговоре — клиент переподключался бы по кругу.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # Буферизация ответа задерживает кадры сокета: сообщение приходило бы пачками.
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+
+env:
+  # Публичный адрес: из него собираются ссылки на вложения и allowlist Host-заголовка.
+  CHAT_PUBLIC_URL: ""
+  # Origin'ы фронта через запятую. Пустое значение или «*» намеренно роняют приложение:
+  # иначе сторонний сайт сможет ходить в API и сокет от имени залогиненного человека.
+  CORS_ORIGINS: "http://localhost:3000,https://dev.sodrujestvo.org"
+  RAILS_LOG_LEVEL: info
+  RAILS_MAX_THREADS: "5"
+  CABLE_WORKER_POOL_SIZE: "8"
+
+# Пороги частоты (ChatLimits). Пусто — берутся значения по умолчанию из кода; правятся тут,
+# без пересборки образа.
+limits: {}
+
+secrets:
+  # Ключ от config/credentials.yml.enc. Подставляет CI из переменной проекта.
+  RAILS_MASTER_KEY: ""
+
+postgres:
+  image: postgres:17-alpine
+  database: chat_demo
+  user: chat
+  storage:
+    size: 5Gi
+    className: yc-network-ssd
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

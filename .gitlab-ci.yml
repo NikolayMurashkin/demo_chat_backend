@@ -1,0 +1,110 @@
+# Сборка и деплой чат-бэка в кластер teachbase-bpsb.
+#
+# Сервис отдельный и самодостаточный: у него свой namespace, своя БД и свой хост, поэтому
+# пайплайн не завязан ни на develop основного фронта, ни на чей-либо релизный цикл. Деплой
+# ручной — «задеплоил и забыл», без автоматики на каждый пуш.
+#
+# Все переменные (YC_KEY, YC_CLOUD_ID, YC_FOLDER_ID, YC_REGISTRY) наследуются от группы,
+# заводить в проекте ничего не нужно. Исключение — RAILS_MASTER_KEY: он лежит только на
+# машине разработчика (config/master.key в .gitignore) и добавляется в переменные проекта
+# как masked.
+default:
+  image: docker:latest
+  tags:
+    - gitlab-runner-bpsb-vm
+
+variables:
+  IMAGE: ${YC_REGISTRY}/chat-demo-api
+  KUBE_CLUSTER: teachbase-bpsb
+  NAMESPACE: chat-demo
+  HELM_RELEASE: chat-demo-api
+  CHAT_HOST: chat-demo-api.dev.sodrujestvo.org
+
+stages:
+  - build
+  - test
+  - deploy
+
+.docker_login: &docker_login
+  - docker info
+  - echo ${YC_KEY} | docker login --username json_key --password-stdin cr.yandex
+
+build:
+  stage: build
+  before_script: *docker_login
+  script:
+    # Слои прошлой сборки экономят на bundle install: без кэша каждая сборка заново
+    # компилирует нативные расширения (pg, sqlite3, bootsnap).
+    - docker pull ${IMAGE}:latest || true
+    - >-
+      docker build
+      --cache-from ${IMAGE}:latest
+      --build-arg BUILDKIT_INLINE_CACHE=1
+      --tag ${IMAGE}:${CI_COMMIT_SHORT_SHA}
+      --tag ${IMAGE}:latest .
+    - docker push ${IMAGE}:${CI_COMMIT_SHORT_SHA}
+    - docker push ${IMAGE}:latest
+
+# Тот же Dockerfile, но с dev/test-гемами: отдельного окружения для прогона не требуется.
+.test_image: &test_image
+  - *docker_login
+  - docker pull ${IMAGE}:latest || true
+  - >-
+    docker build --target build
+    --build-arg BUNDLE_WITHOUT=""
+    --cache-from ${IMAGE}:latest
+    --tag ${IMAGE}:test-${CI_COMMIT_SHORT_SHA} .
+
+rspec:
+  stage: test
+  needs: ["build"]
+  before_script: *test_image
+  script:
+    - docker run --rm -e RAILS_ENV=test ${IMAGE}:test-${CI_COMMIT_SHORT_SHA} bundle exec rspec
+
+rubocop:
+  stage: test
+  needs: ["build"]
+  before_script: *test_image
+  script:
+    - docker run --rm ${IMAGE}:test-${CI_COMMIT_SHORT_SHA} bundle exec rubocop
+
+deploy:
+  stage: deploy
+  image: sanbusrt/helm-deployer:kubedog-custom1
+  needs: ["build", "rspec", "rubocop"]
+  resource_group: chat-demo
+  environment:
+    name: demo
+    url: https://chat-demo-api.dev.sodrujestvo.org
+  before_script:
+    - echo "$YC_KEY" > key.json
+    - yc config profile create sa-profile
+    - yc config set service-account-key key.json
+    - yc config set cloud-id ${YC_CLOUD_ID}
+    - yc config set folder-id ${YC_FOLDER_ID}
+    - yc managed-kubernetes cluster get-credentials ${KUBE_CLUSTER} --internal
+  script:
+    - set -xe
+    - test -n "${RAILS_MASTER_KEY}" || (echo "Нет переменной RAILS_MASTER_KEY" && exit 1)
+    # Namespace и pull-secret заводим сами: заявка в devops для этого не нужна.
+    - kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+    - kubectl --namespace "${NAMESPACE}" create secret docker-registry yc-registry
+      --docker-server=cr.yandex
+      --docker-username=json_key
+      --docker-password="${YC_KEY}"
+      --dry-run=client -o yaml | kubectl apply -f -
+    - helm upgrade --install "${HELM_RELEASE}" .infra
+      --namespace "${NAMESPACE}"
+      --set-string image.repository="${IMAGE}"
+      --set-string image.tag="${CI_COMMIT_SHORT_SHA}"
+      --set-string ingress.host="${CHAT_HOST}"
+      --set-string env.CHAT_PUBLIC_URL="https://${CHAT_HOST}"
+      --set-string secrets.RAILS_MASTER_KEY="${RAILS_MASTER_KEY}"
+      --wait --timeout 5m
+    - kubectl -n "${NAMESPACE}" rollout status deploy/${HELM_RELEASE} --timeout=5m
+  after_script:
+    - rm -f key.json
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual

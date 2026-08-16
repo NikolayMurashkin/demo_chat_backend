@@ -1,0 +1,98 @@
+{{- $secretName := printf "%s-postgres" .Release.Name }}
+{{- /*
+  Пароль генерируется один раз и переживает апгрейды: lookup читает уже существующий секрет,
+  и если его не пересобирать, БД и приложение не разъедутся на следующем деплое. Заводить
+  ради него ещё одну CI-переменную незачем — наружу он не ходит.
+*/}}
+{{- $existing := lookup "v1" "Secret" .Release.Namespace $secretName }}
+{{- $password := "" }}
+{{- if $existing }}
+{{- $password = index $existing.data "password" | b64dec }}
+{{- else }}
+{{- $password = randAlphaNum 32 }}
+{{- end }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $secretName }}
+type: Opaque
+stringData:
+  password: {{ $password | quote }}
+  # Приложение ходит в БД по одной строке подключения — собираем её здесь, чтобы пароль
+  # не размазывался по манифестам.
+  url: {{ printf "postgresql://%s:%s@%s-postgres:5432/%s" .Values.postgres.user $password .Release.Name .Values.postgres.database | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-postgres
+spec:
+  clusterIP: None
+  selector:
+    app: {{ .Release.Name }}-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-postgres
+spec:
+  serviceName: {{ .Release.Name }}-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-postgres
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-postgres
+    spec:
+      securityContext:
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.image | quote }}
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.postgres.database | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.postgres.user | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: password
+            # Данные кладём в подкаталог тома: в корне примонтированного volume остаётся
+            # lost+found, и initdb отказывается работать в непустом каталоге.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - name: postgres
+              containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ .Values.postgres.user | quote }}, "-d", {{ .Values.postgres.database | quote }}]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ .Values.postgres.user | quote }}, "-d", {{ .Values.postgres.database | quote }}]
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.postgres.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: {{ .Values.postgres.storage.className | quote }}
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storage.size | quote }}
