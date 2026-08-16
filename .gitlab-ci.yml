@@ -93,15 +93,23 @@ deploy:
     - yc config set folder-id ${YC_FOLDER_ID}
     - yc managed-kubernetes cluster get-credentials ${KUBE_CLUSTER} --internal
   script:
-    - set -xe
+    # Трассировки здесь быть не должно: set -x печатает команды с подставленными значениями,
+    # а ключ сервисного аккаунта — многострочный JSON, и такие переменные GitLab не маскирует.
+    # С трассировкой приватный ключ уезжал в лог джобы целиком.
+    - set -e
     - test -n "${RAILS_MASTER_KEY}" || (echo "Нет переменной RAILS_MASTER_KEY" && exit 1)
     # Namespace и pull-secret заводим сами: заявка в devops для этого не нужна.
     - kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
-    - kubectl --namespace "${NAMESPACE}" create secret docker-registry yc-registry
-      --docker-server=cr.yandex
-      --docker-username=json_key
-      --docker-password="${YC_KEY}"
+    # Ключ не идёт ни аргументом команды, ни в лог: собираем dockerconfig во временном файле
+    # и отдаём kubectl файлом.
+    - |
+      umask 077
+      printf '{"auths":{"cr.yandex":{"auth":"%s"}}}' "$(printf 'json_key:%s' "$YC_KEY" | base64 | tr -d '\n')" > dockerconfig.json
+    - kubectl --namespace "${NAMESPACE}" create secret generic yc-registry
+      --type=kubernetes.io/dockerconfigjson
+      --from-file=.dockerconfigjson=dockerconfig.json
       --dry-run=client -o yaml | kubectl apply -f -
+    - rm -f dockerconfig.json
     - helm upgrade --install "${HELM_RELEASE}" .infra
       --namespace "${NAMESPACE}"
       --set-string image.repository="${IMAGE}"
