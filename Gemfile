@@ -51,6 +51,6 @@ group :development, :test do
   gem "factory_bot_rails", "~> 6.5"
   gem "faker", "~> 3.5"
   gem "rspec-rails", "~> 8.0"
-  gem "simplecov", "~> 0.22", require: false
+  gem "simplecov", "~> 1.1", require: false
   gem "webmock", "~> 3.26"
 end
