@@ -52,5 +52,5 @@ group :development, :test do
   gem "faker", "~> 3.5"
   gem "rspec-rails", "~> 8.0"
   gem "simplecov", "~> 0.22", require: false
-  gem "webmock", "~> 3.26"
+  gem "webmock", "~> 3.29"
 end
