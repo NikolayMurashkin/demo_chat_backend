@@ -44,7 +44,7 @@ group :development, :test do
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
   gem "rubocop-rspec", "~> 3.8", require: false
-  gem "rubocop-rspec_rails", "~> 2.32", require: false
+  gem "rubocop-rspec_rails", "~> 2.33", require: false
 
   # The same test stack used by the maintained Ruby services. WebMock keeps any future
   # integration tests for link previews from accidentally reaching the public internet.
