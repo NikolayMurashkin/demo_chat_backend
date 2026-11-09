@@ -50,7 +50,7 @@ group :development, :test do
   # integration tests for link previews from accidentally reaching the public internet.
   gem "factory_bot_rails", "~> 6.5"
   gem "faker", "~> 3.5"
-  gem "rspec-rails", "~> 8.0"
+  gem "rspec-rails", "~> 8.1"
   gem "simplecov", "~> 0.22", require: false
   gem "webmock", "~> 3.26"
 end
